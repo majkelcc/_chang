@@ -1,0 +1,58 @@
+#!/usr/bin/env bash -eu
+
+if [ ! -d .chang/bin ]; then
+  echo "Not a chang directory" >&2
+  exit 1
+fi
+
+project_name() {
+  project_name=${PWD##*/}
+  if [[ ! -z ${project_name//[a-z0-9_-]/} ]]; then
+    project_name=""
+  fi
+  path_shasum=`echo $PWD | shasum - | head -c 8`
+  echo "chang${project_name:+_${project_name}}_${path_shasum}"
+}
+
+export CHANG_PROJECT_NAME=`project_name`
+export CHANG_VOLUME=$CHANG_PROJECT_NAME
+export COMPOSE_PROJECT_NAME=$CHANG_PROJECT_NAME
+export BIN=$PWD/.chang/bin
+
+cmd_dir=".chang/bin"
+while [[ ! -z ${1:-} ]]; do
+  [ -d ${cmd_dir}/${1} ] || break
+  cmd_dir+="/$1"
+  shift
+done
+
+cmd=${1:-}
+
+if [[ ${cmd_dir}/${cmd} != ".chang/bin/" ]]; then
+  if [[ -z $cmd ]]; then
+    ${cmd_dir}
+  elif [[ -f ${cmd_dir}/$cmd ]]; then
+    if [[ ! -x ${cmd_dir}/$cmd ]]; then
+      echo "${cmd_dir}/$cmd is not executable" >&2
+      exit 1
+    fi
+    ${cmd_dir}/$cmd "${@:2}"
+  elif [[ -f ${cmd_dir}/${cmd_dir##*/} ]]; then
+    if [[ ! -x ${cmd_dir}/${cmd_dir##*/} ]]; then
+      echo "${cmd_dir}/$cmd is not executable" >&2
+      exit 1
+    fi
+    ${cmd_dir}/${cmd_dir##*/} "${@:1}"
+  else
+    echo "command not found" >&2
+    exit 1
+  fi
+else
+  if [ -x $BIN/status ]; then
+    $BIN/status
+  else
+    echo "chang what?" >&2
+    exit 1
+  fi
+fi
+
